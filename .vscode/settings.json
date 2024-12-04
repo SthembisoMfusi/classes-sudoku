@@ -1,3 +1,4 @@
 {
-    "git.confirmSync": false
+    "git.confirmSync": false,
+    "git.postCommitCommand": "push"
 }
