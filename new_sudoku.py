@@ -82,8 +82,7 @@ class sudoku:
                 for candidate, cells in candidates:
                    print(f"Naked single: {y} cell can only be {candidate}")
             elif size ==2:
-
-
+                y = self.naked_pairs()
         return naked_candidates
         
 
