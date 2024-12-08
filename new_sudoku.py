@@ -2,65 +2,37 @@ class sudoku:
     mod_board = {}
     candidates = {}
 
-    def __init__(self, board):
-        self.board = board
-        self.board_length = len(board)
-        self.possibilities(board)
+    def __init__(self, board_data):
+        self.board = board_data
+        self.board_length = len(self.board)
+        self.possibilities()
 
-    def valid_rows(self, board, row, num):
+    def is_valid_placement(self, row, col, num):
         """
-        Check if a number can be placed in the specified row.
+        Check if a number can be placed at the specified cell.
 
         Params:
-            board (list): The Sudoku board.
-            row (int): The row to check.
-            num (int): The number to check.
+            row (int): The row index.
+            col (int): The column index.
+            num (int): The number to place.
 
         Returns:
-            bool: True if the number can be placed in the row, False otherwise.
+            bool: True if the number can be placed, False otherwise.
         """
-        for j in range(9):
-            if board[row][j] == num:
-                return False
-        return True
+        if num in self.board[row]:
+            return False
 
-    def valid_cols(self, board, col, num):
-        """
-        Check if a number can be placed in the specified column.
+        if num in [self.board[i][col] for i in range(self.board_length)]:
+            return False
 
-        Params:
-            board (list): The Sudoku board.
-            col (int): The column to check.
-            num (int): The number to check.
-
-        Returns:
-            bool: True if the number can be placed in the column, False otherwise.
-        """
-        for i in range(9):
-            if board[i][col] == num:
-                return False
-        return True
-
-    def valid_cell(self, board, row, col, num):
-        """
-        Check if a number can be placed in the specified 3x3 block.
-
-        Params:
-            board (list): The Sudoku board.
-            row (int): The row to check.
-            col (int): The column to check.
-            num (int): The number to check.
-
-        Returns:
-            bool: True if the number can be placed in the 3x3 block, False otherwise.
-        """
-        corner_row = row - row % 3
-        corner_col = col - col % 3
+        corner_row, corner_col = row - row % 3, col - col % 3
         for i in range(3):
             for j in range(3):
-                if board[corner_row + i][corner_col + j] == num:
+                if self.board[corner_row + i][corner_col + j] == num:
                     return False
+
         return True
+
 
     def naked_single(self, val, pos):
         """
@@ -162,7 +134,7 @@ class sudoku:
             self.mod_board[other_cell] = val
             print(f"Updated cell {other_cell} candidates to {self.mod_board[other_cell]}")
 
-    def possibilities(self, board):
+    def possibilities(self):
         """
         Create a dictionary of the original board with all of the cells and the possible numbers that can be placed there.
 
@@ -172,16 +144,14 @@ class sudoku:
         Returns:
             dict: A dictionary with cell positions as keys and a list of possible values as values.
         """
-        for i in range(9):
-            for j in range(9):
-                temp = []
-                if board[i][j] == 0:
-                    for k in range(1, 10):
-                        if self.valid_cell(board, i, j, k) and self.valid_rows(board, i, k) and self.valid_cols(board, j, k):
-                            temp.append(k)
-                    self.mod_board[(i, j)] = temp
-                else:
-                    self.mod_board[(i, j)] = [board[i][j]]
+        for row in range(self.board_length):
+            for col in range(self.board_length):
+                if self.board[row][col] == 0:  # we are looking for empty cells which are represented with a 0
+                    self.mod_board[(row, col)] = [
+                        num for num in range(1, 10) if self.is_valid_placement(row, col, num)
+                    ]
+                else:  
+                    self.mod_board[(row, col)] = self.board[row][col]
         return self.mod_board
 
     def naked_candidates(self):
@@ -193,7 +163,9 @@ class sudoku:
         """
         naked_candidates = []
         naked_potentials = {2: [], 3: []}
-        for key, value in self.mod_board.items():  # separating all of the combination lists by size
+        
+        # Separating all of the combination lists by size
+        for key, value in self.mod_board.items():
             if isinstance(value, list):
                 if len(value) == 1:
                     naked_candidates.append((key, value))
@@ -206,17 +178,23 @@ class sudoku:
         for key, value in naked_candidates:
             if isinstance(value, list) and len(value) == 1:
                 row, col = key
-                self.board[row][col] = value[0]
+                self.place(row, col, value[0])  # Use place method to update the board
                 y = self.naked_single(value[0], key)
                 print(y)
 
-        # Process naked pairs
+                # Process naked pairs
         for size, candidates in naked_potentials.items():
             if size == 2:  # Naked pairs
                 for combo in self.combinations(candidates, size):
-                    group_inds = set([key for key, value in self.mod_board.items() if value in combo[0]])
-                    for k in range(1, size):
-                        group_inds = group_inds.union(set(self.mod_board[combo[k]]))
+                    # Initialize group_inds with empty sets
+                    group_inds = set()
+
+                    # Unpack each pair in combo
+                    for pair in combo:
+                        row, col = pair  # pair is a tuple (row, col)
+                        group_inds.add((row, col))
+
+                    # Check if the number of elements in group_inds equals size
                     if len(group_inds) == size:
                         naked_candidates.append((list(group_inds), combo))
                         # Call the naked pairs function
@@ -225,9 +203,16 @@ class sudoku:
 
             elif size == 3:  # Naked triples
                 for combo in self.combinations(candidates, size):
-                    group_inds = set([key for key, value in self.mod_board.items() if value in combo[0]])
-                    for k in range(1, size):
-                        group_inds = group_inds.union(set(self.mod_board[combo[k]]))
+                    # Initialize group_inds with empty sets
+                    group_inds = set()
+
+                    # Unpack each tuple in combo and update group_inds with individual (row, col)
+                    for item in combo:
+                        for pair in item:
+                            row, col = pair
+                            group_inds.add((row, col))
+
+                    # Check if the number of elements in group_inds equals size
                     if len(group_inds) == size:
                         naked_candidates.append((list(group_inds), combo))
                         # Call the naked triple function
@@ -235,6 +220,147 @@ class sudoku:
 
         return naked_candidates
 
+
+
+    def update_candidates(self, row, col, value, remove=True):
+        """
+        Update the candidates of cells in the same row, column, and subgrid
+        when a value is placed or erased.
+
+        Params:
+            row (int): Row index of the cell being modified.
+            col (int): Column index of the cell being modified.
+            value (int): The value to place or erase.
+            remove (bool): If True, remove the value from candidates; otherwise, add it back.
+        """
+        for i in range(self.board_length):
+            # Update candidates in the row and column
+            if isinstance(self.mod_board.get((row, i)), list):
+                if remove:
+                    self.mod_board[(row, i)].remove(value) if value in self.mod_board[(row, i)] else None
+                else:
+                    if self.is_valid_placement(row, i, value):
+                        self.mod_board[(row, i)].append(value)
+
+            if isinstance(self.mod_board.get((i, col)), list):
+                if remove:
+                    self.mod_board[(i, col)].remove(value) if value in self.mod_board[(i, col)] else None
+                else:
+                    if self.is_valid_placement(i, col, value):
+                        self.mod_board[(i, col)].append(value)
+
+        # Update candidates in the block
+        corner_row, corner_col = row - row % 3, col - col % 3
+        for i in range(3):
+            for j in range(3):
+                cell = (corner_row + i, corner_col + j)
+                if isinstance(self.mod_board.get(cell), list):
+                    if remove:
+                        self.mod_board[cell].remove(value) if value in self.mod_board[cell] else None
+                    else:
+                        if self.is_valid_placement(cell[0], cell[1], value):
+                            self.mod_board[cell].append(value)
+
+    def place(self, row, col, value):
+        """
+        Place a value in the board and update candidates.
+
+        Params:
+            row (int): Row index.
+            col (int): Column index.
+            value (int): The value to place in the cell.
+        """
+        self.board[row][col] = value
+        self.mod_board[(row, col)] = value  # Mark the cell as solved
+        self.update_candidates(row, col, value, remove=True)
+
+    def erase(self, row, col):
+        """
+        Erase a value from the board and restore candidates.
+
+        Params:
+            row (int): Row index.
+            col (int): Column index.
+        """
+        erased_value = self.board[row][col]
+        self.board[row][col] = 0
+        self.mod_board[(row, col)] = [
+            num for num in range(1, 10) if self.is_valid_placement(row, col, num)
+        ]
+        self.update_candidates(row, col, erased_value, remove=False)
+
+    def backtracking_solve(self):
+        """
+        Recursive backtracking solver that uses the `mod_board` candidates.
+        Returns True if the board is solved, otherwise False.
+        """
+        for (row, col), candidates in self.mod_board.items():
+            if self.board[row][col] == 0:  # Find the first empty cell
+                for candidate in candidates:
+                    if self.is_valid_placement(row, col, candidate):
+                        self.board[row][col] = candidate  # Place the candidate
+                        self.update_candidates(row, col, candidate, remove=True)
+
+                        if self.backtracking_solve():
+                            return True
+
+                        # Backtrack
+                        self.board[row][col] = 0
+                        self.update_candidates(row, col, candidate, remove=False)
+
+                return False  # Trigger backtracking
+        return self.is_complete()
+    def x_wing_elimination(self):
+        """
+        Apply the X-Wing pattern elimination to reduce candidates.
+        """
+        for num in range(1, 10):
+            row_positions = [[] for _ in range(9)]
+            col_positions = [[] for _ in range(9)]
+
+            # Collect possible placements for the number
+            for (row, col), candidates in self.mod_board.items():
+                if num in candidates:
+                    row_positions[row].append(col)
+                    col_positions[col].append(row)
+
+            # Find rows with identical column candidates
+            for r1 in range(9):
+                for r2 in range(r1 + 1, 9):
+                    if row_positions[r1] == row_positions[r2] and len(row_positions[r1]) == 2:
+                        cols = row_positions[r1]
+                        for row in range(9):
+                            if row not in (r1, r2):
+                                for col in cols:
+                                    if num in self.mod_board.get((row, col), []):
+                                        self.mod_board[(row, col)].remove(num)
+    def solve(self):
+        """
+        Attempt to solve the Sudoku puzzle using logical techniques
+        and backtracking as a fallback.
+        """
+        while True:
+            prev_board = [row[:] for row in self.board]
+
+            # Apply logical solving techniques
+            self.naked_candidates()
+            self.x_wing_elimination()
+
+            # If no progress is made, stop logical techniques
+            if prev_board == self.board:
+                break
+
+        # Use backtracking if logical techniques are insufficient
+        if not self.is_complete():
+            self.backtracking_solve()
+    def is_complete(self):
+        """
+        Check if the board is fully and correctly solved.
+        """
+        for row in self.board:
+            if 0 in row:
+                return False
+        return True
     def combinations(self, lst, r):
         """
         Generate all r-length combinations of the list.
@@ -259,11 +385,11 @@ class sudoku:
 class board:
     def __init__(self, file):
         self.file = file
-    
+        self.board = self.read_file()
     def read_file(self):
-        with open(self.file, 'r') as j:
+        with open(self.file, 'r') as f:
             board = []
-            content = j.read().strip().split('\n')
+            content = f.read().strip().split('\n')
             for i in content:
                 temp = []
                 line = i.split()
@@ -275,6 +401,6 @@ class board:
 
 
 
-create = board('test.txt').read_file()
-solver = sudoku(create)
+create = board('test.txt')
+solver = sudoku(create.board)
 solver.naked_candidates()
