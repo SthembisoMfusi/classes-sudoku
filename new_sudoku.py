@@ -1,12 +1,37 @@
 import copy
+import argparse
+class SudokuError(Exception):
+    """Custom exception for Sudoku-related errors."""
+    pass
 
+class InvalidSudokuFile(SudokuError):
+    """Exception raised when the input Sudoku file is invalid."""
+    def __init__(self, message="Invalid Sudoku file format."):
+        self.message = message
+        super().__init__(self.message)
 class sudoku:
     def __init__(self, board_data):
-        self.board = board_data
-        self.board_length = len(self.board)
-        self.mod_board = {}  # Initialize mod_board
-        self.backtracking_mod_board = {}  # Initialize backtracking_mod_board
-        self.possibilities()  # Calculate initial possibilities
+        try:
+            self.board = board_data
+            self.board_length = len(self.board)
+            if not self.is_valid_board():
+                raise InvalidSudokuFile("Invalid board dimensions or elements.")
+            self.mod_board = {}
+            self.backtracking_mod_board = {}
+            self.possibilities()
+        except InvalidSudokuFile as e:
+            raise InvalidSudokuFile(f"Error initializing Sudoku: {e}")
+    def is_valid_board(self):
+        """Checks if the board has valid dimensions (9x9) and contains only numbers 0-9."""
+        if self.board_length != 9:
+            return False
+        for row in self.board:
+            if len(row) != 9:
+                return False
+            for cell in row:
+                if not (isinstance(cell, int) and 0 <= cell <= 9):
+                    return False
+        return True
 
     def copy_possibilities(self):
         """
@@ -205,6 +230,7 @@ class sudoku:
 
     def place(self, row, col, value):
         """Place a value and update candidates (forward checking)."""
+        print(f"Placing {value} at row {row + 1}, column {col + 1}")
         self.board[row][col] = value
         self.mod_board[(row, col)] = value
         self.forward_check(row, col, value, remove=True)
@@ -212,6 +238,7 @@ class sudoku:
     def erase(self, row, col):
         """Erase a value and update candidates (forward checking)."""
         erased_value = self.board[row][col]
+        print(f"Erasing {erased_value} from row {row + 1}, column {col + 1} candidates") # Print the change
         self.board[row][col] = 0
         self.mod_board[(row, col)] = [
             num for num in range(1, 10) if self.is_valid_placement(row, col, num)
@@ -394,34 +421,42 @@ class sudoku:
         for comb in self.combinations(lst[1:], r):
             yield comb
 
-    def solve(self):
+    def solve(self, option = None):
         """
         Attempt to solve the Sudoku puzzle using logical techniques
         and backtracking as a fallback.
         """
-        while True:
-            prev_board = [row[:] for row in self.board]
+        if option == "naked":
+            self.solve_with_naked_candidates()
+        elif option == "xwing":
+            self.solve_with_x_wing()
+        elif option == "backtracking":
+            self.solve_with_backtracking()
+        elif option == None:
+            while True:
+                prev_board = [row[:] for row in self.board]
 
-            # Apply logical solving techniques
-            print("Using naked candidates to solve...")
-            self.naked_candidates()
+                # Apply logical solving techniques
+                print("Using naked candidates to solve...")
+                self.naked_candidates()
+                if not self.is_complete():
+                    print("Using x wing to solve...")
+                    self.x_wing_elimination()       
+                # If no progress is made, stop logical techniques
+                if prev_board == self.board or self.is_complete():
+                        break
+                # Use backtracking if logical techniques are insufficient
             if not self.is_complete():
-                print("Using x wing to solve...")
-                self.x_wing_elimination()
-
-            # If no progress is made, stop logical techniques
-            if prev_board == self.board or self.is_complete():
-                break
-
-        # Use backtracking if logical techniques are insufficient
-        if not self.is_complete():
-            print("Using backtracking to solve...")
-            if self.backtracking_solve():
-                print("Sudoku solved!")
+                print("Using backtracking to solve...")
+                if self.backtracking_solve():
+                    print("Sudoku solved!")
+                else:
+                    print("Sudoku unsolvable!")
             else:
-                print("Sudoku unsolvable!")
+                print("Sudoku solved using logical techniques!")
         else:
-            print("Sudoku solved using logical techniques!")
+            raise ValueError("Invalid solving method specified.")
+        
 
         # Print the solved board (or the partially solved board)
         self.display_grid()
@@ -432,18 +467,38 @@ class board:
         self.board = self.read_file()
 
     def read_file(self):
-        with open(self.file, 'r') as f:
-            board = []
-            content = f.read().strip().split('\n')
-            for i in content:
-                temp = []
-                line = i.split()
-                for j in line:
-                    j = int(j)
-                    temp.append(j)
-                board.append(temp)
-        return board
-
+        try:
+            with open(self.file, 'r') as f:
+                board = []
+                content = f.read().strip().split('\n')
+                for i in content:
+                    temp = []
+                    line = i.split()
+                    if len(line) != 9:
+                        raise IndexError
+                    try:
+                        for j in line:
+                            j = int(j)
+                            temp.append(j)
+                        board.append(temp)
+                    except ValueError:
+                        raise InvalidSudokuFile (f"Invalid character in Sudoku file: {j}")
+            return board
+        except FileNotFoundError as e:
+            return f'{self.file} does not exist'
+        
+            
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Solve a Sudoku puzzle.")
+    parser.add_argument("file_path", help="Path to the Sudoku puzzle file")
+    parser.add_argument(
+        "-o",
+        "--option",
+        choices=["naked", "xwing", "backtracking"],
+        default="backtracking",
+        help="Solving method to use (default: all of them in order of: naked, xwing, backtracking)",
+    )
+    args = parser.parse_args()
 # Example usage:
 create = board('test.txt')  # Replace 'test.txt' with your Sudoku file
 solver = sudoku(create.board)
