@@ -356,7 +356,7 @@ class Sudoku():
                 inds_box.append(inds)
         return inds_box
 
-    def flush_candidates(self) -> None:
+    def flush_candidates(self):
         """set candidates across the whole grid, according to logical strategies"""
         # get indices for each set
         inds_box = self.get_all_boxes()
@@ -379,6 +379,21 @@ class Sudoku():
                 # keeps = self.box_line_reduction(inds)
                 # for inds_keep, nums in keeps:
                 #     self.erase(nums, inds, inds_keep)
-                    
+
 class SudokuException(Exception):
     pass
+def open_file():
+    with open('test.txt', 'r') as f:
+            board = []
+            content = f.read().strip().split('\n')
+            for i in content:
+                temp = []
+                line = i.split()
+                for j in line:
+                    j = int(j)
+                    temp.append(j)
+                board.append(temp)
+    return board
+board = open_file()
+solution = Sudoku(board)
+print(solution.flush_candidates())
