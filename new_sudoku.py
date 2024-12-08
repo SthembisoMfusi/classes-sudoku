@@ -1,5 +1,6 @@
 import copy
 import argparse
+import keyboard
 class SudokuError(Exception):
     """Custom exception for Sudoku-related errors."""
     pass
@@ -19,6 +20,7 @@ class sudoku:
             self.mod_board = {}
             self.backtracking_mod_board = {}
             self.possibilities()
+            self.step_mode = False
         except InvalidSudokuFile as e:
             raise InvalidSudokuFile(f"Error initializing Sudoku: {e}")
     def is_valid_board(self):
@@ -39,6 +41,7 @@ class sudoku:
         """
         self.backtracking_mod_board = copy.deepcopy(self.mod_board)
     def display_grid(self):
+        """Displays the grid at the current point"""
         for i in self.board:
             print((" ".join(map(str, i)) + "\n"))
     def is_valid_placement(self, row, col, num):
@@ -142,9 +145,13 @@ class sudoku:
             if isinstance(candidates, list) and len(candidates) == 1:
                 value = candidates[0]
                 self.place(row, col, value)
-                self.display_grid()
                 print(self.naked_single_message(value, (row, col)))
                 change_made = True
+                if self.step_mode:
+                    self.display_grid()
+                    keyboard.wait('space')
+                else:
+                    self.display_grid()
         return change_made
 
     def find_naked_pairs_triples(self, size):
@@ -209,10 +216,18 @@ class sudoku:
 
         if change_made:
             if len(values) == 2:
-                self.display_grid()
+                if self.step_mode:
+                    self.display_grid()
+                    keyboard.wait('space')
+                else: 
+                    self.display_grid()
                 print(self.naked_pairs_message(combination[0], values))
             elif len(values) == 3:
-                self.display_grid()
+                if self.step_mode:
+                    self.display_grid()
+                    keyboard.wait('space')
+                else: 
+                    self.display_grid()
                 print(self.naked_triple_message(combination, values))
 
         return change_made
@@ -331,16 +346,21 @@ class sudoku:
             for candidate in self.backtracking_mod_board[best_cell]:
                 if self.is_valid_placement(row, col, candidate):
                     self.place(row, col, candidate)
-
-                    # Forward checking for backtracking
                     self.forward_check_backtracking(row, col, candidate, remove=True)
-
+                    if self.step_mode:
+                        if self.is_complete(): return True                            
+                        self.display_grid()                        
+                        print(f"Placed {candidate} in ({row+1}, {col+1}). Press 'space' to continue or 'q' to fast-forward")    
+                        while True:
+                            key = keyboard.read_key()
+                            if key == 'space': break                            
+                            elif key == 'q':
+                                self.step_mode = False
+                                print("Entering fast-forward mode (step mode deactivated)...")                                                    
                     if solve_recursive():
                         return True
-
                     # Backtrack
                     self.erase(row, col)
-
                     # Restore candidates
                     self.forward_check_backtracking(row, col, candidate, remove=False)
 
@@ -427,15 +447,19 @@ class sudoku:
         and backtracking as a fallback.
         """
         if option == "naked":
-            self.solve_with_naked_candidates()
+            print("Using naked candidates to solve...")
+            self.naked_candidates()
+            self.display_grid()
         elif option == "xwing":
+            print("Using x wing to solve...")
             self.solve_with_x_wing()
+            self.display_grid()
         elif option == "backtracking":
+            print("Using backtracking to solve...")
             self.solve_with_backtracking()
         elif option == None:
             while True:
-                prev_board = [row[:] for row in self.board]
-
+                prev_board = copy.deepcopy(self.board)
                 # Apply logical solving techniques
                 print("Using naked candidates to solve...")
                 self.naked_candidates()
@@ -475,7 +499,7 @@ class board:
                     temp = []
                     line = i.split()
                     if len(line) != 9:
-                        raise IndexError
+                        raise InvalidSudokuFile('Each row must have 9 cells')
                     try:
                         for j in line:
                             j = int(j)
@@ -490,7 +514,6 @@ class board:
             
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Solve a Sudoku puzzle.")
-    parser.add_argument("file_path", help="Path to the Sudoku puzzle file")
     parser.add_argument(
         "-o",
         "--option",
@@ -498,8 +521,27 @@ if __name__ == "__main__":
         default="backtracking",
         help="Solving method to use (default: all of them in order of: naked, xwing, backtracking)",
     )
+    parser.add_argument("file_path", help="Path to the Sudoku puzzle file")
+    parser.add_argument(
+        "-s",
+        "--step",
+        action="store_true",
+        help="Enable step-by-step solving (for backtracking and xwing)",
+    )
     args = parser.parse_args()
-# Example usage:
-create = board('test.txt')  # Replace 'test.txt' with your Sudoku file
-solver = sudoku(create.board)
-solver.solve()
+    sudoku.step_mode = args.step  # Set step mode based on the argument
+    if args.step:
+        print("Press spacebar to step, 'q' to fast-forward...") # Tell user how to proceed (can step OR skip at any given cell; might skip more steps if desired)         
+        keyboard.wait('space')
+
+    try:        
+        create = board(args.file_path)       
+        if create.board is None:
+             raise InvalidSudokuFile("No input file found or error during parsing")          
+
+        solver = sudoku(create.board)  
+        solver.step_mode = args.step        
+        solver.solve(args.option)        
+
+    except (InvalidSudokuFile) as e: # combined both error types; `solve` should always correctly print results; only file and board issues need unique treatment here 
+        print(f"Error: {e}")
