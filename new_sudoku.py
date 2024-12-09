@@ -1,6 +1,8 @@
 import copy
 import argparse
 import keyboard
+import os
+import datetime
 class SudokuError(Exception):
     """Custom exception for Sudoku-related errors."""
     pass
@@ -21,7 +23,6 @@ class sudoku:
             self.backtracking_mod_board = {}
             self.possibilities()
             self.step_mode = False
-            self.file_write = board.write_file()
         except InvalidSudokuFile as e:
             raise InvalidSudokuFile(f"Error initializing Sudoku: {e}")
     def is_valid_board(self):
@@ -493,11 +494,17 @@ class sudoku:
 
 class board:
     def __init__(self, file, file_target):
+        if file is None:
+            file = "test.txt"  # Default to test.txt if no path is given
+         
         self.file = file
         self.board = self.read_file()
         self.file_target = file_target
 
     def read_file(self):
+        if not os.path.exists(self.file):
+            raise InvalidSudokuFile(f"Input file not found: {self.file}")
+
         try:
             with open(self.file, 'r') as f:
                 board = []
@@ -517,41 +524,67 @@ class board:
             return board
         except FileNotFoundError as e:
             return f'{self.file} does not exist'
-    def write_file(self):
-        with open(self.file_target, 'w') as f:
-            content = f.write()
-        
-            
+    def write_file(self, board, file_path, method_used):  
+        if file_path is None:
+            now = datetime.datetime.now()
+            file_path = f"sudoku_solution_{now.strftime('%Y%m%d_%H%M%S')}.txt"
+        print(f"DEBUG: Writing board to {file_path}")
+        with open(file_path, 'w') as f:
+            for i in board:
+                f.write(" ".join(map(str, i)) + "\n")
+
+            # Write the method used at the end of the file
+            f.write(f"\nSolved using: {method_used}\n")
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Solve a Sudoku puzzle.")
     parser.add_argument(
         "-o",
-        "--option",
-        choices=["naked", "xwing", "backtracking"],
-        default="backtracking",
-        help="Solving method to use (default: all of them in order of: naked, xwing, backtracking)",
+        "--file_path",
+        help="Path to the Sudoku puzzle file (default: test.txt)",
+        default=None,  # Default value is None (will be handled in Board class)
     )
-    parser.add_argument("file_path", help="Path to the Sudoku puzzle file")
+    parser.add_argument(
+        "-l",
+        "--write_file",
+        help="Path to write the solution (default: sudoku_solution_YYYYMMDD_HHMMSS.txt)",
+        default=None,  # Default value is None
+    )
+    parser.add_argument(
+        "-m",
+        "--method",
+        choices=["naked", "xwing", "backtracking", "all"],
+        default="backtracking",
+        help="Solving method to use (default: backtracking. 'all' will try them in order)",
+    )
     parser.add_argument(
         "-s",
         "--step",
         action="store_true",
         help="Enable step-by-step solving (for backtracking and xwing)",
     )
+
     args = parser.parse_args()
-    sudoku.step_mode = args.step  # Set step mode based on the argument
-    if args.step:
-        print("Press spacebar to step, 'f' to fast-forward...") # Tell user how to proceed (can step OR skip at any given cell; might skip more steps if desired)         
-        keyboard.wait('space')
 
-    try:        
-        create = board(args.file_path)       
+    try:
+        create = board(args.file_path, args.write_file)
         if create.board is None:
-             raise InvalidSudokuFile("No input file found or error during parsing")          
+            raise InvalidSudokuFile("Error during parsing")
 
-        solver = sudoku(create.board)  
-        solver.step_mode = args.step        
-        solver.solve(args.option)        
+        solver = sudoku(create.board)
+        solver.step_mode = args.step
+        solver.solve(args.method)
 
-    except (InvalidSudokuFile) as e: # combined both error types; `solve` should always correctly print results; only file and board issues need unique treatment here 
+        # Determine the method used (for reporting)
+        if args.method == "all":
+            if solver.is_complete():
+                method_used = "Logical techniques (Naked Candidates, X-Wing)"
+            else:
+                method_used = "Backtracking"
+        else:
+            method_used = args.method
+
+        # Pass the method_used to write_file
+        create.write_file(solver.board, args.write_file, method_used)
+
+    except InvalidSudokuFile as e:
         print(f"Error: {e}")
