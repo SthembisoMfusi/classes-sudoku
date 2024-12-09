@@ -356,11 +356,12 @@ class sudoku:
                         print(f"Placed {candidate} in ({row+1}, {col+1}). Press 'space' to continue or 'f' to fast-forward")    
                         while True:
                             key = keyboard.read_key()
-                            if key == 'space': break                            
-                            elif key == 'f' or key == 'F':
+                            if key == 'space':
+                                break
+                            elif key == 'f':
                                 self.step_mode = False
-                                print("Entering fast-forward mode (step mode deactivated)... press 'space' to continue")                                                    
-                    if solve_recursive():
+                                print("Entering fast-forward mode (step mode deactivated)...")
+                                break  # Exit the while loop when 'f' is pressed
                         return True
                     # Backtrack
                     self.erase(row, col)
@@ -450,6 +451,9 @@ class sudoku:
         Attempt to solve the Sudoku puzzle using logical techniques
         and backtracking as a fallback.
         """
+        if self.step_mode:
+            print("Press spacebar to step, 'f' to fast-forward...")
+
         if option == "naked":
             print("Using naked candidates to solve...")
             self.naked_candidates()
@@ -481,7 +485,8 @@ class sudoku:
             if not self.is_complete():
                 print("Using backtracking to solve...")
                 if self.backtracking_solve():
-                    print("Sudoku solved!")
+                    self.display_grid()
+                    print(f"Sudoku solved using backtracking, answer can also be found at {board.file_target} ")
                 else:
                     print("Sudoku unsolvable!")
             else:
@@ -528,7 +533,6 @@ class board:
         if file_path is None:
             now = datetime.datetime.now()
             file_path = f"sudoku_solution_{now.strftime('%Y%m%d_%H%M%S')}.txt"
-        print(f"DEBUG: Writing board to {file_path}")
         with open(file_path, 'w') as f:
             for i in board:
                 f.write(" ".join(map(str, i)) + "\n")
@@ -573,7 +577,6 @@ if __name__ == "__main__":
         solver = sudoku(create.board)
         solver.step_mode = args.step
         solver.solve(args.method)
-
         # Determine the method used (for reporting)
         if args.method == "all":
             if solver.is_complete():
@@ -582,9 +585,20 @@ if __name__ == "__main__":
                 method_used = "Backtracking"
         else:
             method_used = args.method
+        if args.write_file:
+            output_file_path = args.write_file
+        else:
+            now = datetime.datetime.now()
+            output_file_path = f"sudoku_solution_{now.strftime('%Y%m%d_%H%M%S')}.txt"
 
         # Pass the method_used to write_file
-        create.write_file(solver.board, args.write_file, method_used)
+        create.write_file(solver.board, output_file_path, method_used)
+
+        # Print the output file location
+        print(f"Sudoku solution written to: {output_file_path}")
 
     except InvalidSudokuFile as e:
         print(f"Error: {e}")
+    if args.step:
+        print("Press spacebar to step, 'f' to fast-forward...")          
+        keyboard.wait('space')
