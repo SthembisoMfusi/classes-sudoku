@@ -21,6 +21,7 @@ class sudoku:
             self.backtracking_mod_board = {}
             self.possibilities()
             self.step_mode = False
+            self.file_write = board.write_file()
         except InvalidSudokuFile as e:
             raise InvalidSudokuFile(f"Error initializing Sudoku: {e}")
     def is_valid_board(self):
@@ -249,6 +250,7 @@ class sudoku:
         self.board[row][col] = value
         self.mod_board[(row, col)] = value
         self.forward_check(row, col, value, remove=True)
+        self.display_grid()
 
     def erase(self, row, col):
         """Erase a value and update candidates (forward checking)."""
@@ -350,18 +352,19 @@ class sudoku:
                     if self.step_mode:
                         if self.is_complete(): return True                            
                         self.display_grid()                        
-                        print(f"Placed {candidate} in ({row+1}, {col+1}). Press 'space' to continue or 'q' to fast-forward")    
+                        print(f"Placed {candidate} in ({row+1}, {col+1}). Press 'space' to continue or 'f' to fast-forward")    
                         while True:
                             key = keyboard.read_key()
                             if key == 'space': break                            
-                            elif key == 'q':
+                            elif key == 'f' or key == 'F':
                                 self.step_mode = False
-                                print("Entering fast-forward mode (step mode deactivated)...")                                                    
+                                print("Entering fast-forward mode (step mode deactivated)... press 'space' to continue")                                                    
                     if solve_recursive():
                         return True
                     # Backtrack
                     self.erase(row, col)
                     # Restore candidates
+                    print('Backtracking...')
                     self.forward_check_backtracking(row, col, candidate, remove=False)
 
             return False
@@ -449,14 +452,18 @@ class sudoku:
         if option == "naked":
             print("Using naked candidates to solve...")
             self.naked_candidates()
-            self.display_grid()
+            if self.is_complete():
+                print("Sudoku solved using logical techniques!")
         elif option == "xwing":
             print("Using x wing to solve...")
             self.solve_with_x_wing()
-            self.display_grid()
+            if self.is_complete():
+                print("Sudoku solved using logical techniques!")
         elif option == "backtracking":
             print("Using backtracking to solve...")
-            self.solve_with_backtracking()
+            self.backtracking_solve()
+            if self.is_complete():
+                print("Sudoku solved using the backtracking technique!")
         elif option == None:
             while True:
                 prev_board = copy.deepcopy(self.board)
@@ -480,15 +487,15 @@ class sudoku:
                 print("Sudoku solved using logical techniques!")
         else:
             raise ValueError("Invalid solving method specified.")
+    
         
 
-        # Print the solved board (or the partially solved board)
-        self.display_grid()
 
 class board:
-    def __init__(self, file):
+    def __init__(self, file, file_target):
         self.file = file
         self.board = self.read_file()
+        self.file_target = file_target
 
     def read_file(self):
         try:
@@ -510,6 +517,9 @@ class board:
             return board
         except FileNotFoundError as e:
             return f'{self.file} does not exist'
+    def write_file(self):
+        with open(self.file_target, 'w') as f:
+            content = f.write()
         
             
 if __name__ == "__main__":
@@ -531,7 +541,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     sudoku.step_mode = args.step  # Set step mode based on the argument
     if args.step:
-        print("Press spacebar to step, 'q' to fast-forward...") # Tell user how to proceed (can step OR skip at any given cell; might skip more steps if desired)         
+        print("Press spacebar to step, 'f' to fast-forward...") # Tell user how to proceed (can step OR skip at any given cell; might skip more steps if desired)         
         keyboard.wait('space')
 
     try:        
