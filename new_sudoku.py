@@ -72,27 +72,28 @@ class sudoku:
         grid_row = row // 3
         grid_col = col // 3
         x = ''
-        if grid_row == 0:
-            if grid_col == 0:
+        match (grid_row, grid_col):
+            case (0, 0):
                 x = "Top-left"
-            elif grid_col == 1:
+            case (0, 1):
                 x = "Top-center"
-            else:
+            case (0, 2):
                 x = "Top-right"
-        elif grid_row == 1:
-            if grid_col == 0:
+            case (1, 0):
                 x = "Middle-left"
-            elif grid_col == 1:
+            case (1, 1):
                 x = "Middle-center"
-            else:
+            case (1, 2):
                 x = "Middle-right"
-        else:
-            if grid_col == 0:
+            case (2, 0):
                 x = "Bottom-left"
-            elif grid_col == 1:
+            case (2, 1):
                 x = "Bottom-center"
-            else:
+            case (2, 2):
                 x = "Bottom-right"
+            case _:  
+                raise ValueError(f'invalid value: {x}')
+
         return f'Naked Single: {x} cell can only be a {val}'
 
     def naked_pairs_message(self, pos, val):
@@ -102,12 +103,15 @@ class sudoku:
         row, col = pos
         grid_row = row // 3
         x = ''
-        if grid_row == 0:
-            x = 'top'
-        elif grid_row == 1:
-            x = 'middle'
-        else:
-            x = 'bottom'
+        match grid_row:
+            case 0:
+                x = 'top'
+            case 1:
+                x = 'middle'
+            case 2:
+                x = 'bottom'
+            case _:  
+               raise ValueError(f'invalid value: {x}')
 
         return f"Disambiguated Pair: The {x} row needs a {val[0]} and a {val[1]}, but only one cell can be a {val[0]}. We fill in {val[0]} and {val[1]}."
 
@@ -118,12 +122,15 @@ class sudoku:
         row, _ = pos[0]  # Get the row from the first cell in the triple
         grid_row = row // 3
         x = ''
-        if grid_row == 0:
-            x = 'top'
-        elif grid_row == 1:
-            x = 'middle'
-        else:
-            x = 'bottom'
+        match grid_row:
+            case 0:
+                x = 'top'
+            case 1:
+                x = 'middle'
+            case 2:
+                x = 'bottom'
+            case _: 
+               raise ValueError(f'invalid value: {x}')
 
         return f"Disambiguated Triple: The {x} row needs {val[0]}, {val[1]}, and {val[2]}. Only these three numbers can be placed in those three cells."
 
@@ -432,20 +439,20 @@ class sudoku:
         Generate all r-length combinations of the list (without itertools).
         """
         n = len(lst)
-        if r > n:
-            return
-        if r == 0:
-            yield ()
-            return
-        if r == n:
-            yield tuple(lst)
-            return
-
+       
+        match r:
+            case _ if r > n:
+                return
+            case 0:
+                yield ()
+                return
+            case _ if r == n:
+                yield tuple(lst)
+                return
         for comb in self.combinations(lst[1:], r - 1):
             yield (lst[0],) + comb
         for comb in self.combinations(lst[1:], r):
             yield comb
-
     def solve(self, option = None):
         """
         Attempt to solve the Sudoku puzzle using logical techniques
@@ -454,45 +461,47 @@ class sudoku:
         if self.step_mode:
             print("Press spacebar to step, 'f' to fast-forward...")
 
-        if option == "naked":
-            print("Using naked candidates to solve...")
-            self.naked_candidates()
-            if self.is_complete():
-                print("Sudoku solved using logical techniques!")
-        elif option == "xwing":
-            print("Using x wing to solve...")
-            self.solve_with_x_wing()
-            if self.is_complete():
-                print("Sudoku solved using logical techniques!")
-        elif option == "backtracking":
-            print("Using backtracking to solve...")
-            self.backtracking_solve()
-            if self.is_complete():
-                print("Sudoku solved using the backtracking technique!")
-        elif option == None:
-            while True:
-                prev_board = copy.deepcopy(self.board)
-                # Apply logical solving techniques
+        match option:
+            case "naked":
                 print("Using naked candidates to solve...")
                 self.naked_candidates()
-                if not self.is_complete():
-                    print("Using x wing to solve...")
-                    self.x_wing_elimination()       
-                # If no progress is made, stop logical techniques
-                if prev_board == self.board or self.is_complete():
+                if self.is_complete():
+                    print("Sudoku solved using logical techniques!")
+            case "xwing":
+                print("Using x wing to solve...")
+                self.x_wing_elimination()  
+                if self.is_complete():
+                    print("Sudoku solved using logical techniques!")
+            case "backtracking":
+                print("Using backtracking to solve...")
+                self.backtracking_solve()
+                if self.is_complete():
+                    print("Sudoku solved using the backtracking technique!")
+            case None:
+                while True:
+                    prev_board = copy.deepcopy(self.board)
+                    # Apply logical solving techniques
+                    print("Using naked candidates to solve...")
+                    self.naked_candidates()
+                    if not self.is_complete():
+                        print("Using x wing to solve...")
+                        self.x_wing_elimination()
+                    # If no progress is made, stop logical techniques
+                    if prev_board == self.board or self.is_complete():
                         break
                 # Use backtracking if logical techniques are insufficient
-            if not self.is_complete():
-                print("Using backtracking to solve...")
-                if self.backtracking_solve():
-                    self.display_grid()
-                    print(f"Sudoku solved using backtracking, answer can also be found at {board.file_target} ")
+                if not self.is_complete():
+                    print("Using backtracking to solve...")
+                    if self.backtracking_solve():
+                        self.display_grid()
+                    else:
+                        print("Sudoku unsolvable!")
                 else:
-                    print("Sudoku unsolvable!")
-            else:
-                print("Sudoku solved using logical techniques!")
-        else:
-            raise ValueError("Invalid solving method specified.")
+                    print("Sudoku solved using logical techniques!")
+            case _:
+                raise ValueError("Invalid solving method specified.")
+
+
     
         
 
